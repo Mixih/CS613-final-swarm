@@ -1,14 +1,13 @@
-import os
 import atexit
 
-from swarmsdn.networks import AdHocNetwork
+from swarmsdn.network import AdHocNetwork
 
 
 RAND_SEED = 1
 
 
 def main():
-    net = AdHocNetwork(10, RAND_SEED, 20, 5, 20, "localhost")
+    net = AdHocNetwork(10, RAND_SEED, 20, 5, 20, "127.0.0.1")
     atexit.register(net.stop_net)
     net.run()
 

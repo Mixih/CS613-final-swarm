@@ -3,8 +3,9 @@ from mininet.node import RemoteController
 from mininet.log import setLogLevel, info
 from random import randint, sample
 import random
+from time import sleep
 
-from swarmsdn.topologies import RoutableNodeTopo
+from swarmsdn.topology import RoutableNodeTopo
 
 
 class AdHocNetwork:
@@ -25,7 +26,11 @@ class AdHocNetwork:
         self.started = False
         self.topo = RoutableNodeTopo(host_cnt)
         self.net = Mininet(
-            topo=self.topo, controller=lambda name: RemoteController(name, ip=controller_ip)
+            topo=self.topo,
+            controller=lambda name: RemoteController(name, ip=controller_ip),
+            listenPort=6633,
+            autoSetMacs=True,
+            waitConnected=True,
         )
         random.seed(seed)
         setLogLevel("info")
@@ -46,6 +51,7 @@ class AdHocNetwork:
                 + str([(link.intf1.node.name, link.intf2.node.name) for link in links_to_drop])
             )
             for link in links_to_drop:
+                self.net.configLinkStatus(link.intf1.node.name, link.intf2.node.name, "down")
                 self.net.delLink(link)
                 self.current_links.remove(link)
                 drop_target -= 1
@@ -60,6 +66,7 @@ class AdHocNetwork:
             if fst_idx == snd_idx or self.net.linksBetween(fst_node, snd_node) != []:
                 continue
             link = self.net.addLink(fst_node, snd_node)
+            self.net.configLinkStatus(fst_node.name, snd_node.name, "up")
             self.current_links.add(link)
             added_links += 1
 
@@ -84,6 +91,7 @@ class AdHocNetwork:
             self.update_links()
             info("Waiting for table updates...\n")
             self.wait_for_updates()
+            sleep(10)
             info("Running assessment...\n")
             self.run_assessment_for_step()
 
