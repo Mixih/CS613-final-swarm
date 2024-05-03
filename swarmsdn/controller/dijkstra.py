@@ -6,24 +6,18 @@ from pox.lib.revent import EventMixin
 from pox.openflow.of_01 import PacketIn, ConnectionUp, PortStatus
 from pox.openflow.discovery import LinkEvent
 
+from swarmsdn.graph import NetGraph
+from swarmsdn.controller.base import GraphControllerBase
+
 log = core.getLogger()
 
 
-class DijkstraController(EventMixin):
+class DijkstraController(GraphControllerBase):
     def __init__(self):
-        self.listenTo(core.openflow)
-        self.listenTo(core.openflow_discovery)
-        core.openflow_discovery.addListeners(self)
+        super().__init__()
 
-    def _handle_LinkEvent(self, event: LinkEvent):
-        # test that discovery works
-        log.debug(event)
-
-    def _handle_openflow_PortStatus(self, event: PortStatus):
-        log.debug(event)
-
-    def _handle_ConnectionUp(self, event: ConnectionUp):
-        log.debug("=========== SW UP EVT ===========")
+    def hook_handle_link_event(self, event: LinkEvent):
+        log.debug(self.graph.nodes)
 
 
 def launch():
