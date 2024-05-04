@@ -9,7 +9,8 @@ log = core.getLogger()
 
 
 class GraphControllerBase(EventMixin):
-    def __init__(self):
+    def __init__(self, debug: bool = False):
+        self.debug = debug
         self.listenTo(core.openflow)
         self.listenTo(core.openflow_discovery)
         core.openflow_discovery.addListeners(self)
@@ -29,11 +30,13 @@ class GraphControllerBase(EventMixin):
 
     def _handle_LinkEvent(self, event: LinkEvent):
         # test that discovery works
-        log.debug("======LINK EVT========")
+        if self.debug:
+            log.debug("======LINK EVT========")
         self.graph.update_from_linkevent(event)
         self.hook_handle_link_event(event)
 
     def _handle_ConnectionUp(self, event: ConnectionUp):
-        log.debug("=========== SW UP EVT ===========")
+        if self.debug:
+            log.debug("=========== SW UP EVT ===========")
         self.graph.register_node(event.dpid)
         self.hook_handle_connetion_up(event)

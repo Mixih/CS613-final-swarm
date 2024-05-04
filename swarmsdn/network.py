@@ -25,11 +25,12 @@ class AdHocNetwork:
 
         self.started = False
         self.topo = RoutableNodeTopo(host_cnt)
+        self.active_pool = self.topo.optional_links
+        self.inactive_pool = set()
         self.net = Mininet(
             topo=self.topo,
             controller=lambda name: RemoteController(name, ip=controller_ip),
             listenPort=6633,
-            autoSetMacs=True,
             waitConnected=True,
         )
         random.seed(seed)
@@ -39,36 +40,38 @@ class AdHocNetwork:
         info("    TODO: performance assessments\n")
 
     def wait_for_updates(self):
-        info("    TODO: IMPLEMENT WAIT.\n")
+        info("    TODO: IMPLEMENT WAIT PROPERLY.\n")
+        sleep(10)
+
+    def _link_to_node_names(self, link: tuple[int, int]):
+        return (f"s{link[0]}", f"s{link[1]}")
+
+    def drop_all_links(self):
+        for link in self.active_pool:
+            self.net.configLinkStatus(*self._link_to_node_names(link), "down")
+            self.inactive_pool.add(link)
+        self.active_pool.clear()
 
     def drop_random_links(self):
-        drop_target = self.dynamic_links
-        while drop_target != 0:
-            current_links_as_list = list(self.current_links)
-            links_to_drop = sample(current_links_as_list, k=drop_target)
-            info(
-                "Dropping links: "
-                + str([(link.intf1.node.name, link.intf2.node.name) for link in links_to_drop])
-            )
-            for link in links_to_drop:
-                self.net.configLinkStatus(link.intf1.node.name, link.intf2.node.name, "down")
-                self.net.delLink(link)
-                self.current_links.remove(link)
-                drop_target -= 1
+        current_links_as_list = list(self.active_pool)
+        links_to_drop = sample(current_links_as_list, k=self.dynamic_links)
+        info(f"Dropping links: {links_to_drop}\n")
+        for link in links_to_drop:
+            self.net.configLinkStatus(*self._link_to_node_names(link), "down")
+            self.inactive_pool.add(link)
+        for link in links_to_drop:
+            self.active_pool.remove(link)
 
     def add_random_links(self, cnt: int):
-        added_links = 0
-        while added_links != cnt:
-            fst_idx = randint(0, self.topo.host_cnt - 1)
-            snd_idx = randint(0, self.topo.host_cnt - 1)
-            fst_node = self.net.switches[fst_idx]
-            snd_node = self.net.switches[snd_idx]
-            if fst_idx == snd_idx or self.net.linksBetween(fst_node, snd_node) != []:
-                continue
-            link = self.net.addLink(fst_node, snd_node)
-            self.net.configLinkStatus(fst_node.name, snd_node.name, "up")
-            self.current_links.add(link)
-            added_links += 1
+        assert len(self.inactive_pool) >= cnt
+        current_links_as_list = list(self.inactive_pool)
+        links_to_add = sample(current_links_as_list, k=self.dynamic_links)
+        info(f"Adding links: {links_to_add}\n")
+        for link in links_to_add:
+            self.net.configLinkStatus(*self._link_to_node_names(link), "up")
+            self.active_pool.add(link)
+        for link in links_to_add:
+            self.inactive_pool.remove(link)
 
     def update_links(self):
         self.drop_random_links()
@@ -82,8 +85,10 @@ class AdHocNetwork:
         self.net.start()
         self.started = True
 
+        self.drop_all_links()
         self.add_random_links(self.starting_links)
         self.add_random_links(self.dynamic_links)
+        self.wait_for_updates()
 
         for t in range(0, self.time_steps):
             info(f"Timestep t={t}\n")
@@ -91,7 +96,6 @@ class AdHocNetwork:
             self.update_links()
             info("Waiting for table updates...\n")
             self.wait_for_updates()
-            sleep(10)
             info("Running assessment...\n")
             self.run_assessment_for_step()
 
