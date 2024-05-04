@@ -17,7 +17,7 @@ class DijkstraController(GraphControllerBase):
         super().__init__()
 
     def hook_handle_link_event(self, event: LinkEvent):
-        log.debug(self.graph.nodes)
+        pass
 
 
 def launch():
