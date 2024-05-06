@@ -9,7 +9,7 @@ from pox.lib.addresses import EthAddr
 from swarmsdn.graph import NetLinkUnidir, NetGraphNodeDir
 from swarmsdn.controller.base import GraphControllerBase
 from swarmsdn.openflow import InPacketMeta, InPacketType
-from swarmsdn.util import PrioritizedItem
+from swarmsdn.util import PrioritizedItem, dpid_to_mac
 
 log = core.getLogger()
 
@@ -92,7 +92,7 @@ class DijkstraController(GraphControllerBase):
         print(len(prev))
         log.debug("starting unwind")
         for dpid, port in self._unwind_backlinks(src, prev).items():
-            mac_for_dpid = EthAddr(f"02:00:00:00:ff:{dpid:02x}")
+            mac_for_dpid = dpid_to_mac(dpid)
             self.l2routes[src.dpid].register_mac(mac_for_dpid, port)
 
 

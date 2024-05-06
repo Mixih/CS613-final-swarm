@@ -13,6 +13,7 @@ from pox.lib.addresses import EthAddr
 from swarmsdn.graph import NetGraphBidir
 from swarmsdn.table import MacTable
 from swarmsdn.openflow import InPacketMeta, InPacketType
+from swarmsdn.util import host_ip_to_mac
 
 log = core.getLogger()
 
@@ -162,8 +163,7 @@ class GraphControllerBase(EventMixin):
         # have the switch pretend to be a router and respond to the arp
         if a.opcode == arp.REQUEST:
             # last octet is always the host number
-            dhost_no = pkt_info.dst_ip.toUnsigned() & 0xFF
-            dmac = EthAddr(f"02:00:00:00:ff:{dhost_no:02x}")
+            dmac = host_ip_to_mac(pkt_info.dst_ip)
             # construct and send reply
             r = arp(
                 hwtype=a.hwtype,
