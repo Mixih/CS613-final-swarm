@@ -10,7 +10,7 @@ import pox.openflow.libopenflow_01 as of
 from pox.openflow.of_01 import Connection
 from pox.lib.addresses import EthAddr
 
-from swarmsdn.graph import NetGraph
+from swarmsdn.graph import NetGraphBidir
 from swarmsdn.table import MacTable
 from swarmsdn.openflow import InPacketMeta, InPacketType
 
@@ -34,11 +34,11 @@ class GraphControllerBase(EventMixin):
         core.openflow_discovery.addListeners(self)
 
         self.debug = debug
-        self.graph = NetGraph()  # clear manually!
+        self.graph = NetGraphBidir()
         self.graph_updated = False
         self.l2routes: dict[int, MacTable] = {}
 
-    def hook_connetion_up(self, event: ConnectionUp) -> None:
+    def hook_connection_up(self, event: ConnectionUp) -> None:
         """
         Override in child classes to implement additional connection up behaviour
         """
@@ -56,7 +56,7 @@ class GraphControllerBase(EventMixin):
         decisions are made. (e.g. lazy routing table updates). Return False if the rest of
         the default packet in handler should not be run, otherwise return True.
         """
-        pass
+        return True
 
     def hook_packet_in_postrouting(self, event: PacketIn) -> None:
         """
@@ -108,7 +108,7 @@ class GraphControllerBase(EventMixin):
         )
 
     def _disable_flood_on_port(self, conn: Connection, port_no: int):
-        p: of.ofp_phy_port = conn.ports[1]
+        p: of.ofp_phy_port = conn.ports[port_no]
         msg = of.ofp_port_mod(
             port_no=p.port_no, hw_addr=p.hw_addr, config=of.OFPPC_NO_FLOOD, mask=of.OFPPC_NO_FLOOD
         )
@@ -121,7 +121,6 @@ class GraphControllerBase(EventMixin):
         # OFPP_FLOOD: output all openflow ports expect the input port and those with
         #    flooding disabled via the OFPPC_NO_FLOOD port config bit
         msg.actions.append(of.ofp_action_output(port=of.OFPP_FLOOD))
-        log.debug("Unknown swdport for dmac on DPID, flooding packet to all ports.")
         connection.send(msg)
 
     def _install_fwd_rule(self, connection: Connection, pkt_info: InPacketMeta, dport: int):
@@ -145,12 +144,55 @@ class GraphControllerBase(EventMixin):
         msg.actions.append(of.ofp_action_output(port=of.OFPP_TABLE))
         connection.send(msg)
 
-    def _handle_arp(self, connection: Connection, pkt_info: InPacketMeta):
-        pass
+    def _handle_fwd(self, dpid: int, connection: Connection, pkt_info: InPacketMeta):
+        dport = self.l2routes[dpid].get_port(pkt_info.dmac)
+        # if we have a route, add the rule and send it
+        if dport is not None:
+            log.debug("Trying to forward packet using rules")
+            self._install_fwd_rule(connection, pkt_info, dport)
+        # otherwise flood it to local nodes
+        else:
+            log.debug("Unknown swdport for dmac on DPID, flooding packet to all ports.")
+            self._flood(connection, pkt_info)
+        # if neither work, that means we didn't have a route and the packet dies
+
+    def _handle_arp(self, dpid: int, connection: Connection, pkt_info: InPacketMeta):
+        a: arp = pkt_info.pkt.next
+        # arp is request, propagating is too hard at l2
+        # have the switch pretend to be a router and respond to the arp
+        if a.opcode == arp.REQUEST:
+            # last octet is always the host number
+            dhost_no = pkt_info.dst_ip.toUnsigned() & 0xFF
+            dmac = EthAddr(f"02:00:00:00:ff:{dhost_no:02x}")
+            # construct and send reply
+            r = arp(
+                hwtype=a.hwtype,
+                prototype=a.prototype,
+                hwlen=a.hwlen,
+                protolen=a.protolen,
+                opcode=arp.REPLY,
+                hwdst=a.hwsrc,
+                protodst=a.protosrc,
+                protosrc=a.protodst,
+                hwsrc=dmac,
+            )
+            e = ethernet(type=ethernet.ARP_TYPE, src=dmac, dst=a.hwsrc)
+            e.set_payload(r)
+            log.debug(f"switch {dpid} sending ARP response on behalf of {a.protodst}, {dmac}")
+            msg = of.ofp_packet_out()
+            msg.data = e.pack()
+            msg.actions.append(of.ofp_action_output(port=pkt_info.iport))
+            connection.send(msg)
+        # arp is something else (probably a reply), handle as a normal packet
+        else:
+            log.debug(f"Arp packet of type {a.opcode} found, forwarding.")
+            self._handle_fwd(connection, pkt_info)
 
     def _handle_PacketIn(self, event: PacketIn):
+        # ipv6 is stupid, ignore it
+        if event.parsed.effective_ethertype == ethernet.IPV6_TYPE:
+            return
         log.debug("############ NEW PACKET IN EVT ############")
-
         dpid: int = event.dpid
         pkt_info, pkt_type = self._parse_packet_from_event(event)
 
@@ -164,7 +206,8 @@ class GraphControllerBase(EventMixin):
         if not self.hook_packet_in_prerouting(pkt_info, pkt_type):
             return
 
-        dport = self.mac_routes[dpid].fwd_table.get_port(pkt_info.dmac)
+        log.debug("routing packet")
+        log.debug(self.l2routes[dpid].mac_table)
 
         # learn mac mapping for directly connected nodes only
         if self.l2routes[dpid].get_port(pkt_info.smac) is None and pkt_info.smac != EthAddr(
@@ -174,15 +217,9 @@ class GraphControllerBase(EventMixin):
 
         # the controller can directly resolve arp requests using some invariants
         if pkt_type == InPacketType.ARP:
-            self._handle_arp(event.connection, pkt_info)
+            self._handle_arp(dpid, event.connection, pkt_info)
         else:
-            # if we have a route, add the rule and send it
-            if dport is not None:
-                self._install_fwd_rule(event.connection, pkt_info, dport)
-            # otherwise flood it to local nodes
-            else:
-                self._flood(event.connection, pkt_info)
-        # if neither work, that means we didn't have a route and the packet dies
+            self._handle_fwd(dpid, event.connection, pkt_info)
 
     def _handle_LinkEvent(self, event: LinkEvent):
         # test that discovery works
@@ -204,6 +241,7 @@ class GraphControllerBase(EventMixin):
     def _handle_ConnectionUp(self, event: ConnectionUp):
         if self.debug:
             log.debug("=========== SW UP EVT ===========")
+        log.debug(f"switch {event.dpid} is coming up")
         self.graph.register_node(event.dpid)
         self.l2routes[event.dpid] = MacTable()
-        self.hook_handle_connetion_up(event)
+        self.hook_connection_up(event)

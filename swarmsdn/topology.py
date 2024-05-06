@@ -15,14 +15,14 @@ class RoutableNodeTopo(Topo):
 
     def build(self):
         # build modeled Ad-hoc nodes as a 1:1 host switch combo
-        for i in range(0, self.host_cnt):
+        for i in range(1, self.host_cnt + 1):
             sconfig = {"dpid": f"{i:016x}"}
             self.addSwitch(f"s{i}", **sconfig)
             self.addHost(f"h{i}", ip=f"10.0.0.{i}", mac=f"02:00:00:00:ff:{i:02x}")
             self.addLink(f"h{i}", f"s{i}")
         # build fully connected components
-        for i in range(0, self.host_cnt - 1):
-            for j in range(i, self.host_cnt - 1):
+        for i in range(1, self.host_cnt):
+            for j in range(i, self.host_cnt + 1):
                 if i == j:
                     continue
                 if j - 1 == i:

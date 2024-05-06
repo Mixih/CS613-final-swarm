@@ -4,6 +4,7 @@ from mininet.log import setLogLevel, info
 from random import randint, sample
 import random
 from time import sleep
+from mininet.cli import CLI
 
 from swarmsdn.topology import RoutableNodeTopo
 
@@ -38,10 +39,11 @@ class AdHocNetwork:
 
     def run_assessment_for_step(self):
         info("    TODO: performance assessments\n")
+        CLI(self.net)
 
     def wait_for_updates(self):
         info("    TODO: IMPLEMENT WAIT PROPERLY.\n")
-        sleep(10)
+        sleep(1)
 
     def _link_to_node_names(self, link: tuple[int, int]):
         return (f"s{link[0]}", f"s{link[1]}")
@@ -81,11 +83,24 @@ class AdHocNetwork:
         if self.started:
             self.net.stop()
 
+    def disable_ipv6(self):
+        """
+        IPV6 messages clutter the logs, just disable them to prevent the clutter
+        Ref: https://gist.github.com/tudang/87da66215116e2ba5afd250a9fb8a9c8
+        """
+        for h in self.net.hosts:
+            print(f"{h}: disable ipv6")
+            h.cmd("sysctl -w net.ipv6.conf.all.disable_ipv6=1")
+            h.cmd("sysctl -w net.ipv6.conf.default.disable_ipv6=1")
+            h.cmd("sysctl -w net.ipv6.conf.lo.disable_ipv6=1")
+
     def run(self):
         self.net.start()
+        self.disable_ipv6()
         self.started = True
 
         self.drop_all_links()
+        sleep(10)
         self.add_random_links(self.starting_links)
         self.add_random_links(self.dynamic_links)
         self.wait_for_updates()
