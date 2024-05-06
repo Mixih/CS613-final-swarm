@@ -18,7 +18,7 @@ class RoutableNodeTopo(Topo):
         for i in range(0, self.host_cnt):
             sconfig = {"dpid": f"{i:016x}"}
             self.addSwitch(f"s{i}", **sconfig)
-            self.addHost(f"h{i}", ip=f"10.0.{i}.2", mac=f"02:00:00:00:00:{i:02x}")
+            self.addHost(f"h{i}", ip=f"10.0.0.{i}", mac=f"02:00:00:00:ff:{i:02x}")
             self.addLink(f"h{i}", f"s{i}")
         # build fully connected components
         for i in range(0, self.host_cnt - 1):

@@ -11,8 +11,9 @@ class InPacketMeta:
     iport: int
     smac: EthAddr
     dmac: EthAddr
-    src_ip: Optional(IPAddr)
-    dst_ip: Optional(IPAddr)
+    src_ip: Optional[IPAddr]
+    dst_ip: Optional[IPAddr]
+    ethtype: int
     pkt: ethernet
 
 
