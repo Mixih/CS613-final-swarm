@@ -1,18 +1,16 @@
-from pox.core import core
-from pox.openflow.of_01 import ConnectionUp, PacketIn
-from pox.lib.revent import EventMixin
-from pox.openflow.discovery import LinkEvent
-from pox.lib.util import dpid_to_str
-from pox.lib.packet.arp import arp
-from pox.lib.packet.ipv4 import ipv4
-from pox.lib.packet.ethernet import ethernet
 import pox.openflow.libopenflow_01 as of
-from pox.openflow.of_01 import Connection
+from pox.core import core
 from pox.lib.addresses import EthAddr
-
+from pox.lib.packet.arp import arp
+from pox.lib.packet.ethernet import ethernet
+from pox.lib.packet.ipv4 import ipv4
+from pox.lib.revent import EventMixin
+from pox.lib.util import dpid_to_str
+from pox.openflow.discovery import LinkEvent
+from pox.openflow.of_01 import Connection, ConnectionUp, PacketIn
 from swarmsdn.graph import NetGraphBidir
-from swarmsdn.table import MacTable
 from swarmsdn.openflow import InPacketMeta, InPacketType
+from swarmsdn.table import MacTable
 from swarmsdn.util import host_ip_to_mac
 
 log = core.getLogger()
@@ -73,7 +71,30 @@ class GraphControllerBase(EventMixin):
 
     def clear_of_tables_for_switch(self, dpid: int):
         msg = of.ofp_flow_mod(command=of.OFPFC_DELETE)
-        core.openflow.connections[dpid].send(msg)
+        core.openflow.getConnection(dpid).send(msg)
+
+    def _set_port_flood_mode(self, dpid: int, port_no: int, flood: bool):
+        conn = core.openflow.getConnection(dpid)
+        if conn is None or port_no not in conn.ports:
+            return
+        p: of.ofp_phy_port = conn.ports[port_no]
+        msg = of.ofp_port_mod(
+            port_no=p.port_no,
+            hw_addr=p.hw_addr,
+            config=0 if flood else of.OFPPC_NO_FLOOD,
+            mask=of.OFPPC_NO_FLOOD,
+        )
+        conn.send(msg)
+
+    def _clear_rules_for_port(self, dpid: int, port: int):
+        conn = core.openflow.getConnection(dpid)
+        if conn is None:
+            return
+        msg = of.ofp_flow_mod(match=of.ofp_match(in_port=port), command=of.OFPFC_DELETE)
+        conn.send(msg)
+        for mac in self.l2routes[dpid].get_macs_by_port(port):
+            msg = of.ofp_flow_mod(match=of.ofp_match(dl_dst=mac), command=of.OFPFC_DELETE)
+            conn.send(msg)
 
     def _parse_packet_from_event(self, event: PacketIn) -> tuple[InPacketMeta, InPacketType]:
         pkt = event.parsed
@@ -107,13 +128,6 @@ class GraphControllerBase(EventMixin):
             ),
             pkt_type,
         )
-
-    def _disable_flood_on_port(self, conn: Connection, port_no: int):
-        p: of.ofp_phy_port = conn.ports[port_no]
-        msg = of.ofp_port_mod(
-            port_no=p.port_no, hw_addr=p.hw_addr, config=of.OFPPC_NO_FLOOD, mask=of.OFPPC_NO_FLOOD
-        )
-        conn.send(msg)
 
     def _flood(self, connection: Connection, pkt_info: InPacketMeta):
         msg = of.ofp_packet_out()
@@ -206,8 +220,8 @@ class GraphControllerBase(EventMixin):
         if not self.hook_packet_in_prerouting(pkt_info, pkt_type):
             return
 
-        log.debug("routing packet")
-        log.debug(self.l2routes[dpid].mac_table)
+        log.debug("Routing packet")
+        log.debug(f"My l2table is: {self.l2routes[dpid].mac_table}")
 
         # learn mac mapping for directly connected nodes only
         if self.l2routes[dpid].get_port(pkt_info.smac) is None and pkt_info.smac != EthAddr(
@@ -227,16 +241,18 @@ class GraphControllerBase(EventMixin):
             log.debug("======LINK EVT========")
         self.graph.update_from_linkevent(event)
         self.graph_updated = True
-        # discovered connections are EXTERNAL between switches and should not accept arp
-        # flood
         if event.added:
-            self._disable_flood_on_port(
-                core.openflow.getConnection(event.link.dpid1), event.link.port1
-            )
-            self._disable_flood_on_port(
-                core.openflow.getConnection(event.link.dpid2), event.link.port2
-            )
-        self.hook_handle_link_event(event)
+            # discovered connections are EXTERNAL between switches and should not accept arp
+            # flood
+            self._set_port_flood_mode(event.link.dpid1, event.link.port1, False)
+            self._set_port_flood_mode(event.link.dpid2, event.link.port2, False)
+        if event.removed:
+            # re-enable flooding, clear openflow rules on switches that would sinkhole
+            self._set_port_flood_mode(event.link.dpid1, event.link.port1, True)
+            self._set_port_flood_mode(event.link.dpid2, event.link.port2, True)
+            self._clear_rules_for_port(event.link.dpid1, event.link.port1)
+            self._clear_rules_for_port(event.link.dpid2, event.link.port2)
+        self.hook_link_event(event)
 
     def _handle_ConnectionUp(self, event: ConnectionUp):
         if self.debug:
