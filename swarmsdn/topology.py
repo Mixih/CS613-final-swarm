@@ -2,15 +2,16 @@ from mininet.topo import Topo
 
 
 class RoutableNodeTopo(Topo):
-    def __init__(self, hosts: int):
+    def __init__(self, hosts: int, delay="5ms"):
         assert hosts < 256
+        self.switch_link_delay = delay
         self.host_cnt = hosts
         self.backbone_links: set[tuple[int, int]] = set()
         self.optional_links: set[tuple[int, int]] = set()
         super().__init__()
 
     def _add_link(self, pool: set[tuple[int, int]], link: tuple[int, int]):
-        self.addLink(*[f"s{ln}" for ln in link])
+        self.addLink(*[f"s{ln}" for ln in link], delay=self.switch_link_delay)
         pool.add(link)
 
     def build(self):

@@ -37,9 +37,6 @@ class DijkstraController(GraphControllerBase):
     def _unwind_backlinks(self, src: NetGraphNodeDir, table: dict[int, NetLinkUnidir]):
         out: dict[int, int] = {}
         dpids_remaining = set(table.keys())
-        print(src.dpid)
-        print(table)
-        print(self.graph.nodes[src.dpid])
         while True:
             if len(dpids_remaining) == 0:
                 break
@@ -59,12 +56,11 @@ class DijkstraController(GraphControllerBase):
                 backref = table[dpid]
                 new_dpids.add(dpid)
                 dpids_remaining.remove(dpid)
-            # import pdb; pdb.set_trace()
             if port is None:
                 port = backref.dport
             for dpid in new_dpids:
                 out[dpid] = port
-            print(out)
+        log.debug(f"dpid/port table: {out}")
         return out
 
     def run_dijkstra_from_node(self, src: NetGraphNodeDir):
@@ -97,7 +93,7 @@ class DijkstraController(GraphControllerBase):
 
 
 def launch():
-    pox.openflow.discovery.launch()
+    pox.openflow.discovery.launch(link_timeout=5)
 
     def start_controller():
         log.debug("Starting dijkstra controller...")

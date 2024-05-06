@@ -26,7 +26,7 @@ class GraphControllerBase(EventMixin):
     To make changes use self.l2routes[<dpid>] methods
     """
 
-    ENTRY_TIMEOUT = 5
+    ENTRY_TIMEOUT = 120
     PRI_FWD = 1
 
     def __init__(self, debug: bool = False):
