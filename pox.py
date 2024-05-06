@@ -1,7 +1,7 @@
 #!/bin/python3
 
-import sys
 import os.path
+import sys
 
 from pox.boot import boot
 

@@ -1,8 +1,8 @@
 from dataclasses import dataclass
-from pox.lib.addresses import IPAddr, EthAddr
-from pox.lib.packet.ethernet import ethernet
-
 from enum import Enum
+
+from pox.lib.addresses import EthAddr, IPAddr
+from pox.lib.packet.ethernet import ethernet
 
 
 @dataclass

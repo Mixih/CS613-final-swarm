@@ -1,13 +1,9 @@
-from heapq import heappush, heappop
+from heapq import heappop, heappush
 
 import pox.openflow.discovery
-
 from pox.core import core
-from pox.openflow.discovery import LinkEvent
-from pox.lib.addresses import EthAddr
-
-from swarmsdn.graph import NetLinkUnidir, NetGraphNodeDir
 from swarmsdn.controller.base import GraphControllerBase
+from swarmsdn.graph import NetGraphNodeDir, NetLinkUnidir
 from swarmsdn.openflow import InPacketMeta, InPacketType
 from swarmsdn.util import PrioritizedItem, dpid_to_mac
 
@@ -17,9 +13,6 @@ log = core.getLogger()
 class DijkstraController(GraphControllerBase):
     def __init__(self):
         super().__init__()
-
-    def hook_handle_link_event(self, event: LinkEvent):
-        pass
 
     def hook_packet_in_prerouting(self, pkt_info: InPacketMeta, packet_type: InPacketType) -> bool:
         # update tables if the topo changed

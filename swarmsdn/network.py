@@ -1,13 +1,13 @@
-from random import sample
-from csv import DictWriter
 import random
+from csv import DictWriter
+from random import sample
 from time import sleep
 
 from mininet.cli import CLI
-from mininet.net import Mininet
 from mininet.link import TCLink
+from mininet.log import info, setLogLevel
+from mininet.net import Mininet
 from mininet.node import RemoteController
-from mininet.log import setLogLevel, info
 
 from swarmsdn.topology import RoutableNodeTopo
 
@@ -15,6 +15,7 @@ from swarmsdn.topology import RoutableNodeTopo
 class AdHocNetwork:
     def __init__(
         self,
+        data_log_base: str,
         time_steps: int,
         seed: int,
         host_cnt: int,
@@ -44,7 +45,8 @@ class AdHocNetwork:
 
         # logging
         self.datafile = open(
-            f"data/ping_adhoc_s{seed}_ts{time_steps}_h{host_cnt}_sl{starting_links}_dl{dynamic_links}.csv",
+            f"data/{data_log_base}-ping_adhoc_s{seed}_ts{time_steps}_h{host_cnt}"
+            f"_sl{starting_links}_dl{dynamic_links}.csv",
             "w",
             newline="",
         )
