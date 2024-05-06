@@ -15,7 +15,7 @@ class Ant:
     def reset_ant(self, start_node=None):
         # this is for initializaiton or reseting conditions
         if start_node is None:
-            start_node = self.random_state.choice(list(self.graph.nodes.keys()))
+            start_node = self.graph.random_node()
         self.current_node = start_node
         self.path = [start_node]
         self.distance_traveled = 0.0
@@ -39,7 +39,8 @@ class Ant:
             return random.choice(neighbors)  # prevent division by zero if total pirobability is 0
 
         probabilities = [p / total for p in probabilities]
-        return self.random_state.choices(neighbors, weights=probabilities, k=1)[0]
+        chosen_node = self.random_state.choices(neighbors, weights=probabilities, k=1)[0]
+        return chosen_node
 
     def move_to_next_node(self):
         next_node = self.select_next_node()

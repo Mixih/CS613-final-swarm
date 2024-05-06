@@ -5,6 +5,7 @@ from pox.openflow.discovery import LinkEvent
 from swarmsdn.graph import NetGraphAnt
 from swarmsdn.aco.ant import Ant
 from swarmsdn.controller.base import GraphControllerBase
+
 log = core.getLogger()
 
 class ACOController(GraphControllerBase):
@@ -16,34 +17,48 @@ class ACOController(GraphControllerBase):
         self.evaporation_rate = evaporation_rate
         self.ants = []
         self.initialize_ants()
+        self.global_counter = 0  # Tracks number of topology change events
+        self.last_reset = 1  # Tracks the last event index at which ants were reset
 
     def initialize_ants(self):
-        # ants start at random nodes in the graph
+        # Initialize ants at random nodes in the graph
         for _ in range(self.num_ants):
             start_node = self.graph.random_node()
             ant = Ant(start_node, self.graph, self.alpha, self.beta)
             self.ants.append(ant)
 
     def run_ants(self):
-        # for each ant find a path through the network
+        # Each ant finds a path through the network and deposits pheromones
         for ant in self.ants:
-            while True:
-                if not ant.move_to_next_node():
-                    break
+            while ant.move_to_next_node():
+                pass
             ant.deposit_pheromones()
             ant.reset_ant()
-
-        # kill pheromones on all edges
         self.graph.evaporate_pheromones(self.evaporation_rate)
+
+    def adjust_ant_population(self):
+        # Adjust the number of ants based on the number of network nodes
+        current_nodes = len(self.graph.nodes)
+        desired_ants = max(10, current_nodes **2 ) # scale quadratically
+        if desired_ants != self.num_ants:
+            self.num_ants = desired_ants
+            self.initialize_ants()  # Reinitialize ants
+            log.info(f"Adjusted number of ants to {self.num_ants} due to network change.")
 
     def hook_handle_connection_up(self, event: ConnectionUp):
         log.debug("New device connected with DPID: %s", event.dpid)
-        # Handle new connections here TODO: not sure what the ideal number of ants should be but i think it makes sense to scale quadratically? you?
+        self.adjust_ant_population()
+        self.global_counter += 1
 
     def hook_handle_link_event(self, event: LinkEvent):
         log.debug("Link event: %s", "Added" if event.added else "Removed")
         self.graph.update_from_linkevent(event)
-        # Optionally reset ant paths if the topology changes significantly TODO:
+        self.global_counter += 1
+        # Reset ants if significant topology changes have occurred
+        if self.global_counter / ((self.last_reset + 1) * 4) > 0.75:
+            for ant in self.ants:
+                ant.reset_ant()
+            self.last_reset = self.global_counter
 
 def launch():
     def start_aco_controller():
@@ -51,5 +66,4 @@ def launch():
         core.registerNew(ACOController)
 
     core.call_when_ready(start_aco_controller, ['openflow_discovery'])
-
 
