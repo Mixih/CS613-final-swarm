@@ -1,9 +1,13 @@
-from mininet.net import Mininet
-from mininet.node import RemoteController
-from mininet.log import setLogLevel, info
-from random import randint, sample
+from random import sample
+from csv import DictWriter
 import random
 from time import sleep
+
+from mininet.cli import CLI
+from mininet.net import Mininet
+from mininet.link import TCLink
+from mininet.node import RemoteController
+from mininet.log import setLogLevel, info
 
 from swarmsdn.topology import RoutableNodeTopo
 
@@ -19,6 +23,7 @@ class AdHocNetwork:
         controller_ip: str,
     ):
         self.time_steps = time_steps
+        self.cur_time_step = 0
         self.starting_links = starting_links
         self.dynamic_links = dynamic_links
         self.current_links: set[tuple[str, str]] = set()
@@ -32,15 +37,51 @@ class AdHocNetwork:
             controller=lambda name: RemoteController(name, ip=controller_ip),
             listenPort=6633,
             waitConnected=True,
+            link=TCLink,
         )
         random.seed(seed)
         setLogLevel("info")
 
+        # logging
+        self.datafile = open(
+            f"data/ping_adhoc_s{seed}_ts{time_steps}_h{host_cnt}_sl{starting_links}_dl{dynamic_links}.csv",
+            "w",
+            newline="",
+        )
+        self.data_writer = DictWriter(
+            self.datafile,
+            fieldnames=[
+                "timestep",
+                "batch",
+                "src",
+                "dst",
+                "sent",
+                "recieved",
+                "rtt",
+            ],
+        )
+        self.data_writer.writeheader()
+
     def run_assessment_for_step(self):
-        info("    TODO: performance assessments\n")
+        # CLI(self.net)
+        for batch in range(0, 2):
+            pingouts = self.net.pingAllFull()
+            for pingout in pingouts:
+                src, dst, stats = pingout
+                row = {
+                    "timestep": self.cur_time_step,
+                    "batch": batch,
+                    "src": src.name,
+                    "dst": dst.name,
+                    "sent": stats[0],
+                    "recieved": stats[1],
+                    # this is technically RTTMIN, but since the pingall command only issues the
+                    # ping once, it's simply the rtt
+                    "rtt": stats[2],
+                }
+                self.data_writer.writerow(row)
 
     def wait_for_updates(self):
-        info("    TODO: IMPLEMENT WAIT PROPERLY.\n")
         sleep(10)
 
     def _link_to_node_names(self, link: tuple[int, int]):
@@ -78,19 +119,34 @@ class AdHocNetwork:
         self.add_random_links(self.dynamic_links)
 
     def stop_net(self):
+        self.datafile.close()
         if self.started:
             self.net.stop()
 
+    def disable_ipv6(self):
+        """
+        IPV6 messages clutter the logs, just disable them to prevent the clutter
+        Ref: https://gist.github.com/tudang/87da66215116e2ba5afd250a9fb8a9c8
+        """
+        for h in self.net.hosts:
+            print(f"{h}: disable ipv6")
+            h.cmd("sysctl -w net.ipv6.conf.all.disable_ipv6=1")
+            h.cmd("sysctl -w net.ipv6.conf.default.disable_ipv6=1")
+            h.cmd("sysctl -w net.ipv6.conf.lo.disable_ipv6=1")
+
     def run(self):
         self.net.start()
+        self.disable_ipv6()
         self.started = True
 
         self.drop_all_links()
         self.add_random_links(self.starting_links)
         self.add_random_links(self.dynamic_links)
-        self.wait_for_updates()
+        # self.wait_for_updates()
 
         for t in range(0, self.time_steps):
+            self.cur_time_step = t
+            info("=============\n")
             info(f"Timestep t={t}\n")
             info("Updating links...\n")
             self.update_links()

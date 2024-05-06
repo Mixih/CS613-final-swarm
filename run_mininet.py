@@ -7,7 +7,7 @@ RAND_SEED = 1
 
 
 def main():
-    net = AdHocNetwork(10, RAND_SEED, 20, 5, 20, "127.0.0.1")
+    net = AdHocNetwork(10, RAND_SEED, 15, 5, 10, "127.0.0.1")
     atexit.register(net.stop_net)
     net.run()
 
