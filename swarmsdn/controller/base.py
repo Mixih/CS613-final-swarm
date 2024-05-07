@@ -1,5 +1,3 @@
-from typing import Type
-
 import pox.openflow.libopenflow_01 as of
 from pox.core import core
 from pox.lib.addresses import EthAddr
@@ -11,7 +9,7 @@ from pox.lib.util import dpid_to_str
 from pox.openflow.discovery import LinkEvent
 from pox.openflow.of_01 import Connection, ConnectionUp, PacketIn
 
-from swarmsdn.graph import NetGraphBidir
+from swarmsdn.graph import INetGraph, NetGraph
 from swarmsdn.openflow import InPacketMeta, InPacketType
 from swarmsdn.table import MacTable
 from swarmsdn.util import host_ip_to_mac
@@ -30,13 +28,13 @@ class GraphControllerBase(EventMixin):
     ENTRY_TIMEOUT = 120
     PRI_FWD = 1
 
-    def __init__(self, graph_class, debug: bool = False):
+    def __init__(self, graph_class: type[INetGraph] = NetGraph, debug: bool = False):
         self.listenTo(core.openflow)
         self.listenTo(core.openflow_discovery)
         core.openflow_discovery.addListeners(self)
 
         self.debug = debug
-        self.graph = NetGraphBidir()
+        self.graph = graph_class()
         self.graph_updated = False
         self.l2routes: dict[int, MacTable] = {}
 
@@ -143,6 +141,7 @@ class GraphControllerBase(EventMixin):
 
     def _install_fwd_rule(self, connection: Connection, pkt_info: InPacketMeta, dport: int):
         # queue up flow table addition
+        log.debug(f"forwarding on port {dport}")
         match = of.ofp_match(
             in_port=pkt_info.iport,
             dl_src=pkt_info.smac,

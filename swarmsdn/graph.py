@@ -6,21 +6,18 @@ from pox.openflow.discovery import LinkEvent
 
 class INetGraph(ABC):
     @abstractmethod
-    def register_node(self, dpid: int) -> None:
-        ...
+    def register_node(self, dpid: int) -> None: ...
 
     @abstractmethod
-    def add_connection(self, first_dpid: int, first_port: int, second_dpid: int,
-                       second_port: int) -> None:
-        ...
+    def add_connection(
+        self, first_dpid: int, first_port: int, second_dpid: int, second_port: int
+    ) -> None: ...
 
     @abstractmethod
-    def delete_connection(self, first_dpid: int, second_dpid: int) -> None:
-        ...
+    def delete_connection(self, first_dpid: int, second_dpid: int) -> None: ...
 
     @abstractmethod
-    def update_from_linkevent(self, event: LinkEvent) -> None:
-        ...
+    def update_from_linkevent(self, event: LinkEvent) -> None: ...
 
 
 @dataclass

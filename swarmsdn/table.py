@@ -27,6 +27,15 @@ class MacTable:
         del self.mac_table[mac]
         self.reverse_map[port].remove(mac)
 
+    def try_remove(self, mac: EthAddr) -> bool:
+        if mac not in self.mac_table:
+            return False
+        else:
+            port = self.mac_table[mac]
+            del self.mac_table[mac]
+            self.reverse_map[port].remove(mac)
+            return True
+
     def flush(self):
         self.mac_table.clear()
         self.reverse_map.clear()

@@ -4,7 +4,7 @@ import pox.openflow.discovery
 from pox.core import core
 
 from swarmsdn.controller.base import GraphControllerBase
-from swarmsdn.graph import NetGraphNodeDir, NetLinkUnidir
+from swarmsdn.graph import NetGraphNode, NetLink
 from swarmsdn.openflow import InPacketMeta, InPacketType
 from swarmsdn.util import PrioritizedItem, dpid_to_mac
 
@@ -28,7 +28,7 @@ class DijkstraController(GraphControllerBase):
         # flush openflow tables to force all tables to update
         self.clear_all_of_tables()
 
-    def _unwind_backlinks(self, src: NetGraphNodeDir, table: dict[int, NetLinkUnidir]):
+    def _unwind_backlinks(self, src: NetGraphNode, table: dict[int, NetLink]):
         out: dict[int, int] = {}
         dpids_remaining = set(table.keys())
         while True:
@@ -57,9 +57,9 @@ class DijkstraController(GraphControllerBase):
         log.debug(f"dpid/port table: {out}")
         return out
 
-    def run_dijkstra_from_node(self, src: NetGraphNodeDir):
+    def run_dijkstra_from_node(self, src: NetGraphNode):
         pq = []
-        prev: dict[int, NetLinkUnidir] = {}
+        prev: dict[int, NetLink] = {}
         costs: dict[int, int] = {dpid: -1 for dpid in self.graph.nodes}
 
         log.debug("starting dijkstra")
@@ -68,13 +68,13 @@ class DijkstraController(GraphControllerBase):
         while len(pq) != 0:
             pq_item = heappop(pq)
             cost = pq_item.priority
-            u: NetGraphNodeDir = pq_item.item
+            u: NetGraphNode = pq_item.item
             for next_dpid, link in u.links.items():
                 v = link.dnode
                 candidate_cost = cost + link.cost
                 if costs[v.dpid] == -1 or candidate_cost < costs[v.dpid]:
                     costs[v.dpid] = candidate_cost
-                    prev[v.dpid] = NetLinkUnidir(
+                    prev[v.dpid] = NetLink(
                         cost=link.cost, sport=link.dport, dport=link.sport, dnode=u
                     )
                     heappush(pq, PrioritizedItem(priority=candidate_cost, item=v))

@@ -5,7 +5,7 @@ from pox.openflow.discovery import LinkEvent
 from pox.openflow.of_01 import ConnectionUp
 
 from swarmsdn.controller.base import GraphControllerBase
-from swarmsdn.graph import NetGraphNodeDir
+from swarmsdn.graph import NetGraphNode
 from swarmsdn.openflow import InPacketMeta, InPacketType
 from swarmsdn.util import dpid_to_mac
 
@@ -49,7 +49,7 @@ class DistanceVectorController(GraphControllerBase):
         # flush openflow tables to force all tables to update
         self.clear_all_of_tables()
 
-    def _update_dv_at_node(self, node: NetGraphNodeDir):
+    def _update_dv_at_node(self, node: NetGraphNode):
         # seed dv with our mac at zero cost
         new_table = {}
         dv = {dpid_to_mac(node.dpid): 0}
