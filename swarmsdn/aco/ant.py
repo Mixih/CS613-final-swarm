@@ -19,6 +19,7 @@ class Ant:
 
     def reset_ant(self):
         pass
+
     #     start_node = self.graph.random_node()
     #     # self.current_node = start_node
     #     self.path = [(start_node, None)]  # Initialize path with the start node and no port

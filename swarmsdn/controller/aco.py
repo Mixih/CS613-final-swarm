@@ -1,15 +1,15 @@
 from typing import cast
 
-from pox.core import core
 import pox.openflow.discovery
+from pox.core import core
 from pox.openflow.discovery import LinkEvent
 from pox.openflow.of_01 import ConnectionUp
 
 from swarmsdn.aco.ant import Ant
-from swarmsdn.controller.base import GraphControllerBase
 from swarmsdn.aco.graph import NetGraphAnt
-from swarmsdn.util import dpid_to_mac
+from swarmsdn.controller.base import GraphControllerBase
 from swarmsdn.openflow import InPacketMeta, InPacketType
+from swarmsdn.util import dpid_to_mac
 
 log = core.getLogger()
 
@@ -19,7 +19,7 @@ class ACOController(GraphControllerBase):
         self,
         num_ants=10,
         alpha=1.0,
-        beta=2.0,
+        beta=1.0,
         evaporation_rate=0.5,
         convergence_threshold=0.1,
         max_iterations=5,
@@ -48,7 +48,7 @@ class ACOController(GraphControllerBase):
         converged = True
         self.shortest_path_cost.clear()
 
-
+        saved_paths = [None for _ in range(0, len(self.ants))]
         while iteration_count < self.max_iterations:
             # clear all current routes
             for table in self.l2routes.values():
@@ -56,14 +56,15 @@ class ACOController(GraphControllerBase):
             iteration_count += 1
 
             log.debug("iterating over ants")
+            ant_num = 0
             for ant in self.ants:
                 # while ant.move_to_next_node():
                 #     pass
                 # ant.deposit_pheromones()
                 # self.aggregate_path_data(ant)
                 # ant.reset_ant()
-                path = ant.run()
-                self.aggregate_path_data(path)
+                saved_paths[ant_num] = ant.run()
+                ant_num += 1
 
             converged = True
             for node in self.graph.nodes.values():
@@ -87,6 +88,7 @@ class ACOController(GraphControllerBase):
                 self.graph.evaporate_pheromones(self.evaporation_rate)
         if iteration_count >= self.max_iterations:
             log.info("Maximum iterations reached. Stopping ACO.")
+        self.process_routes(saved_paths)
         self.last_pheromone_levels = {}
         return converged
 
@@ -98,26 +100,27 @@ class ACOController(GraphControllerBase):
     #             self.path_aggregation[(src_node, dst_node)] = {'count': 0, 'port': src_port}
     #         self.path_aggregation[(src_node, dst_node)]['count'] += 1
 
-    def aggregate_path_data(self, path):
-        if (len(path) < 2):
-            return
-        # print(ant.path)
-        src_dpid, _ = path[0]
-        src_port = path[1][1].sport
-        assert src_dpid == path[1][1].snode.dpid
-        running_cost = 0
-        for i in range(0, len(path) - 1):
-            this_dpid, _ = path[i]
-            next_dpid, link = path[i + 1]
-            running_cost += link.cost
-            this_mac = dpid_to_mac(this_dpid)
-            next_mac = dpid_to_mac(next_dpid)
-            self.l2routes[src_dpid].try_remove(next)
-            self.l2routes[src_dpid].register_mac(next_mac, src_port)
-            self.l2routes[this_dpid].try_remove(next_mac)
-            self.l2routes[this_dpid].register_mac(next_mac, link.sport)
-            self.l2routes[next_dpid].try_remove(this_mac)
-            self.l2routes[next_dpid].register_mac(this_mac, link.dport)
+    def process_routes(self, paths):
+        best_cost: dict[tuple[int, int], int] = {}
+        for path in paths:
+            if len(path) < 2:
+                continue
+            s_dpid = path[0][0]
+            d_dpid = path[-1][0]
+            smac = dpid_to_mac(s_dpid)
+            dmac = dpid_to_mac(d_dpid)
+            path_cost = sum(map(lambda ent: ent[1].cost, path[1:]))
+            route_key = (s_dpid, d_dpid)
+            log.debug(f"Cost for route: {route_key} is {path_cost}")
+            if route_key not in best_cost or path_cost < best_cost[route_key]:
+                for i in range(0, len(path) - 1):
+                    this_dpid, _ = path[i]
+                    next_dpid, link = path[i + 1]
+                    # running_cost += link.cost
+                    self.l2routes[this_dpid].try_remove(dmac)
+                    self.l2routes[this_dpid].register_mac(dmac, link.sport)
+                    self.l2routes[next_dpid].try_remove(smac)
+                    self.l2routes[next_dpid].register_mac(smac, link.dport)
 
     # def output_forwarding_tables(self):
     #     for table in self.l2routes.values():
@@ -148,9 +151,17 @@ class ACOController(GraphControllerBase):
     #     while self.converged == False:
     #         self.run_ants()
 
+    def hook_link_event(self, event: LinkEvent):
+        # log.debug("Link event: %s", "Added" if event.added else "Removed")
+        # self.graph.update_from_linkevent(event)
+        # while self.converged == False:
+        # self.run_ants()
+        self.graph.clear_pheromones()
+
     def hook_packet_in_prerouting(self, pkt_info: InPacketMeta, packet_type: InPacketType):
         if self.graph_updated:
             self.run_ants()
+            self.clear_all_of_tables()
             self.graph_updated = False
         return True
 

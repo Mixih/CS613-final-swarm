@@ -67,7 +67,7 @@ class AdHocNetwork:
     def run_assessment_for_step(self):
         # CLI(self.net)
         for batch in range(0, 2):
-            pingouts = self.net.pingFull(timeout=1)
+            pingouts = self.net.pingFull(timeout=5)
             for pingout in pingouts:
                 src, dst, stats = pingout
                 row = {

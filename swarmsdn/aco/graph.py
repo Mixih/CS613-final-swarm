@@ -19,9 +19,11 @@ class NetLinkAnt:
         return self.__str__()
 
     def __str__(self):
-        return (f"<{self.__class__.__name__}, cost: {self.cost}, sport: {self.sport},"
-                f"dport: {self.dport}, snode: {self.snode.dpid}, dnode: {self.dnode.dpid},"
-                f"pheremone_level: {self.pheromone_level}>")
+        return (
+            f"<{self.__class__.__name__}, cost: {self.cost}, sport: {self.sport},"
+            f"dport: {self.dport}, snode: {self.snode.dpid}, dnode: {self.dnode.dpid},"
+            f"pheremone_level: {self.pheromone_level}>"
+        )
 
 
 @dataclass
@@ -36,13 +38,11 @@ class NetGraphAnt(INetGraph):
 
     def register_node(self, dpid: int):
         if dpid not in self.nodes:
-            self.nodes[dpid] = NetGraphNodeAnt(dpid=dpid, active_ports=set([1]))
+            self.nodes[dpid] = NetGraphNodeAnt(dpid=dpid)
 
     def add_connection(self, first_dpid: int, first_port: int, second_dpid: int, second_port: int):
         node1 = self.nodes[first_dpid]
         node2 = self.nodes[second_dpid]
-        node1.active_ports.add(first_port)
-        node2.active_ports.add(first_port)
         if node2.dpid not in node1.links:
             node1.links[node2.dpid] = NetLinkAnt(
                 cost=1, sport=first_port, dport=second_port, snode=node1, dnode=node2
@@ -86,7 +86,7 @@ class NetGraphAnt(INetGraph):
             for link in node.links.values():
                 link.pheromone_level *= 1 - evaporation_rate
 
-    def clear_pheromones(self, evaporation_rate):
+    def clear_pheromones(self):
         for node in self.nodes.values():
             for link in node.links.values():
                 link.pheromone_level = 0.0

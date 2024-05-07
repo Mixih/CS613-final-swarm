@@ -38,6 +38,7 @@ class DistanceVectorController(GraphControllerBase):
 
     def _run_dv_update(self):
         i = 0
+        log.info("Updating routes using distance-vector algorithm.")
         while i < self.DV_ITER_LIMIT:
             log.debug(f"Running DV update iteration {i}")
             updated = False
@@ -73,7 +74,7 @@ def launch():
     pox.openflow.discovery.launch(link_timeout=5)
 
     def start_controller():
-        log.debug("Starting distance vector controller...")
+        log.info("Starting distance vector controller...")
         core.registerNew(DistanceVectorController)
 
     core.call_when_ready(start_controller, "openflow_discovery")

@@ -62,7 +62,7 @@ class DijkstraController(GraphControllerBase):
         prev: dict[int, NetLink] = {}
         costs: dict[int, int] = {dpid: -1 for dpid in self.graph.nodes}
 
-        log.debug("starting dijkstra")
+        log.info("Starting dijkstra routing")
         costs[src.dpid] = 0
         heappush(pq, PrioritizedItem(priority=0, item=src))
         while len(pq) != 0:
@@ -80,7 +80,7 @@ class DijkstraController(GraphControllerBase):
                     heappush(pq, PrioritizedItem(priority=candidate_cost, item=v))
         self.l2routes[src.dpid].flush()
         print(len(prev))
-        log.debug("starting unwind")
+        log.info("Unwinding found paths")
         for dpid, port in self._unwind_backlinks(src, prev).items():
             mac_for_dpid = dpid_to_mac(dpid)
             self.l2routes[src.dpid].register_mac(mac_for_dpid, port)
@@ -90,7 +90,7 @@ def launch():
     pox.openflow.discovery.launch(link_timeout=5)
 
     def start_controller():
-        log.debug("Starting dijkstra controller...")
+        log.info("Starting dijkstra controller...")
         core.registerNew(DijkstraController)
 
     core.call_when_ready(start_controller, "openflow_discovery")
