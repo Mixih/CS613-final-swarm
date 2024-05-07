@@ -1,7 +1,7 @@
-from dataclasses import dataclass, field
 import random
-from pox.openflow.discovery import LinkEvent
+from dataclasses import dataclass, field
 
+from pox.openflow.discovery import LinkEvent
 
 
 @dataclass
@@ -19,6 +19,7 @@ class NetLinkAnt:
     def __str__(self):
         return (f"<NetLinkAnt, cost: {self.cost}, port1: {self.port1}, port2: {self.port2}, "
                 f"node1: {self.node1.dpid}, node2: {self.node2.dpid}, pheromone: {self.pheromone_level}>")
+
 
 @dataclass
 class NetGraphNodeAnt:
@@ -45,7 +46,7 @@ class NetGraphAnt:
 
         node1.links[second_dpid] = link
         node2.links[first_dpid] = link
-    
+
     def delete_connection(self, first_dpid: int, second_dpid: int):
         if first_dpid in self.nodes and second_dpid in self.nodes[first_dpid].links:
             del self.nodes[first_dpid].links[second_dpid]

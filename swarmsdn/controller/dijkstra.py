@@ -2,6 +2,7 @@ from heapq import heappop, heappush
 
 import pox.openflow.discovery
 from pox.core import core
+
 from swarmsdn.controller.base import GraphControllerBase
 from swarmsdn.graph import NetGraphNodeDir, NetLinkUnidir
 from swarmsdn.openflow import InPacketMeta, InPacketType

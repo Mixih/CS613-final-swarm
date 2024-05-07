@@ -1,8 +1,10 @@
+import random
+
 import pox.openflow.libopenflow_01 as of
 from pox.core import core
 from pox.lib.revent import EventMixin
-from pox.openflow.of_01 import PacketIn, ConnectionUp, PortStatus
-import random
+from pox.openflow.of_01 import ConnectionUp, PacketIn, PortStatus
+
 
 class Ant:
     def __init__(self, start_node, graph, alpha=1.0, beta=1.0):

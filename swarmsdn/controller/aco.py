@@ -1,12 +1,13 @@
 from pox.core import core
 from pox.lib.revent import EventMixin
-from pox.openflow.of_01 import ConnectionUp
 from pox.openflow.discovery import LinkEvent
-from swarmsdn.graph import NetGraphAnt
+from pox.openflow.of_01 import ConnectionUp
+
 from swarmsdn.aco.ant import Ant
 from swarmsdn.controller.base import GraphControllerBase
-from swarmsdn.util import dpid_to_mac
+from swarmsdn.graph import NetGraphAnt
 from swarmsdn.table import MacTable
+from swarmsdn.util import dpid_to_mac
 
 log = core.getLogger()
 

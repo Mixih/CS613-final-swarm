@@ -3,6 +3,7 @@ from pox.core import core
 from pox.lib.addresses import EthAddr
 from pox.openflow.discovery import LinkEvent
 from pox.openflow.of_01 import ConnectionUp
+
 from swarmsdn.controller.base import GraphControllerBase
 from swarmsdn.graph import NetGraphNodeDir
 from swarmsdn.openflow import InPacketMeta, InPacketType
@@ -72,7 +73,7 @@ def launch():
     pox.openflow.discovery.launch(link_timeout=5)
 
     def start_controller():
-        log.debug("Starting dijkstra controller...")
+        log.debug("Starting distance vector controller...")
         core.registerNew(DistanceVectorController)
 
     core.call_when_ready(start_controller, "openflow_discovery")

@@ -1,3 +1,5 @@
+from typing import Type
+
 import pox.openflow.libopenflow_01 as of
 from pox.core import core
 from pox.lib.addresses import EthAddr
@@ -8,6 +10,7 @@ from pox.lib.revent import EventMixin
 from pox.lib.util import dpid_to_str
 from pox.openflow.discovery import LinkEvent
 from pox.openflow.of_01 import Connection, ConnectionUp, PacketIn
+
 from swarmsdn.graph import NetGraphBidir
 from swarmsdn.openflow import InPacketMeta, InPacketType
 from swarmsdn.table import MacTable
@@ -27,7 +30,7 @@ class GraphControllerBase(EventMixin):
     ENTRY_TIMEOUT = 120
     PRI_FWD = 1
 
-    def __init__(self, debug: bool = False):
+    def __init__(self, graph_class, debug: bool = False):
         self.listenTo(core.openflow)
         self.listenTo(core.openflow_discovery)
         core.openflow_discovery.addListeners(self)
